@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>İnfaz Hesaplayıcı (Otomatik Yaş & TCK)</title>
+<style>
+    :root { 
+        --primary: #2c3e50; 
+        --header-bg: #34495e;
+        --accent: #e67e22; /* Turuncu vurgu */
+        --success: #27ae60;
+        --error: #c0392b;
+        --bg: #f4f7f6;
+        --panel-bg: #ffffff;
+    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; color: #333; font-size: 13px; }
+    .container { max-width: 1100px; margin: 0 auto; background: var(--panel-bg); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; }
+    
+    .header { background: var(--header-bg); color: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid var(--accent); }
+    .header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    
+    /* Bilgi Çubukları */
+    .info-bar { display: flex; text-align: center; border-bottom: 1px solid #eee; }
+    .info-item { flex: 1; padding: 10px; font-size: 12px; font-weight: bold; color: #555; background: #fdfdfd; }
+    .info-active { background: var(--accent); color: white; }
+    .info-error { background: var(--error); color: white; }
+    .info-success { background: var(--success); color: white; }
+
+    .grid-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    @media (max-width: 768px) { .grid-wrapper { grid-template-columns: 1fr; } }
+
+    .panel { padding: 25px; border-right: 1px solid #eee; }
+    .panel:last-child { border-right: none; }
+    
+    .section-title { 
+        font-weight: 700; color: var(--primary); border-bottom: 2px solid #ecf0f1; 
+        padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; font-size: 12px; 
+    }
+
+    .form-group { margin-bottom: 15px; position: relative; }
+    label { display: block; font-weight: 700; margin-bottom: 5px; color: #555; font-size: 12px; }
+    
+    select, input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; background: #fafafa; transition:0.3s; }
+    select:focus, input:focus { border-color: var(--accent); background: #fff; outline: none; }
+    
+    /* Kilitli input stili */
+    select:disabled, input:disabled { background: #e9ecef; color: #6c757d; cursor: not-allowed; border-color: #dee2e6; }
+
+    .row-inputs { display: flex; gap: 10px; }
+    
+    .special-cases { background: #fff8e1; border: 1px solid #ffe0b2; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+    .checkbox-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
+    .checkbox-item input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+    
+    .yas-badge {
+        position: absolute; right: 0; top: 0; 
+        font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: bold;
+        display: none;
+    }
+
+    .btn-calc { 
+        width: 100%; background: var(--primary); color: white; padding: 15px; 
+        border: none; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 20px; border-radius: 4px; 
+    }
+    .btn-calc:hover { background: #34495e; }
+    .btn-calc:disabled { background: #95a5a6; cursor: not-allowed; }
+
+    /* Sonuç */
+    .result-box { display: none; padding: 25px; background: #fff; border-top: 5px solid #eee; }
+    .t-row { display: flex; margin-bottom: 15px; align-items: center; }
+    .t-date { width: 110px; text-align: right; padding-right: 20px; font-weight: bold; color: var(--primary); }
+    .t-card { flex: 1; padding: 10px 15px; border-radius: 6px; border: 1px solid #eee; background: #f9f9f9; border-left: 4px solid #ccc; }
+    
+    .t-kapali .t-card { border-left-color: #c0392b; background: #fff5f5; }
+    .t-acik .t-card { border-left-color: #f39c12; background: #fffdf5; }
+    .t-denetim .t-card { border-left-color: #27ae60; background: #f0fff4; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>⚖️ İnfaz Hesaplayıcı (Otomatik TCK Analizi)</h1>
+        <div style="font-size:11px; opacity:0.8;">v11.0</div>
+    </div>
+
+    <div class="info-bar">
+        <div id="badgeYas" class="info-item">Yaş Bekleniyor...</div>
+        <div id="badgeDonem" class="info-item">Dönem Bekleniyor...</div>
+    </div>
+
+    <div class="grid-wrapper">
+        <div class="panel">
+            <div class="section-title">1. Kişi ve Suç Bilgileri</div>
+            
+            <div class="form-group">
+                <label style="color:#c0392b">1. Suç Tarihi:</label>
+                <input type="date" id="sucTarihi" onchange="analizEt()">
+            </div>
+
+            <div class="form-group">
+                <label style="color:#2980b9">2. Failin Doğum Tarihi:</label>
+                <input type="date" id="dogumTarihi" onchange="analizEt()">
+                <span id="yasEtiket" class="yas-badge" style="background:#eee; color:#333;">-</span>
+            </div>
+
+            <div class="form-group">
+                <label>Suç Türü:</label>
+                <select id="sucTipi" onchange="analizEt()">
+                    <option value="adi">Adi Suçlar (Genel)</option>
+                    <optgroup label="Ağır Ceza">
+                        <option value="kasten_oldurme">Kasten Öldürme</option>
+                        <option value="cinsel">Cinsel Suçlar</option>
+                        <option value="uyusturucu">Uyuşturucu Ticareti</option>
+                    </optgroup>
+                    <option value="teror">Terör Suçları</option>
+                </select>
+            </div>
+
+            <div class="special-cases">
+                <label class="checkbox-item" id="lblMukerrir">
+                    <input type="checkbox" id="chkMukerrir" onchange="analizEt()">
+                    <span class="cb-label">Mükerrir (Tekerrür)</span>
+                </label>
+                <div style="font-size:10px; color:#666; margin-left:24px;">*Çocuklarda (18 yaş altı) tekerrür uygulanmaz.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Kesinleşmiş Ceza:</label>
+                <div class="row-inputs">
+                    <input type="number" id="hYil" placeholder="Yıl" min="0">
+                    <input type="number" id="hAy" placeholder="Ay" min="0">
+                    <input type="number" id="hGun" placeholder="Gün" min="0">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Cezaevine Giriş & Mahsup:</label>
+                <div class="row-inputs">
+                    <input type="date" id="girisTarihi">
+                    <input type="number" id="mahsup" placeholder="Gözaltı Gün">
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="section-title">2. Sistem Tarafından Belirlenen Rejim</div>
+            
+            <div class="form-group">
+                <label>Uygulanacak Oran (Otomatik):</label>
+                <select id="infazOrani" disabled>
+                    <option value="0.5">1/2 (Adi/Çocuk)</option>
+                    <option value="0.6666666667">2/3 (Ağır/Mükerrir)</option>
+                    <option value="0.75">3/4 (Terör)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Denetimli Serbestlik:</label>
+                <select id="denetimSuresi" disabled>
+                    <option value="1yil">Maktu 1 Yıl</option>
+                    <option value="3yil">Maktu 3 Yıl (Geçici Md.6)</option>
+                    <option value="yeni_40">Yeni Kanun (%40 Yatar Şartı)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Açığa Ayrılma Kuralı:</label>
+                <select id="acikKurali" disabled>
+                    <option value="1/10">1/10 Kuralı</option>
+                    <option value="1ay">Maktu 1 Ay</option>
+                    <option value="yok">Yok / Kapalı</option>
+                </select>
+            </div>
+            
+            <div id="hesaplamaUyari" style="display:none; color:red; font-weight:bold; margin-top:10px; font-size:12px;">
+                ⚠️ 0-12 Yaş grubunun cezai ehliyeti yoktur. Hesaplama yapılamaz.
+            </div>
+
+            <button class="btn-calc" id="btnHesapla" onclick="hesapla()">HESAPLA</button>
+        </div>
+    </div>
+
+    <div class="result-box" id="sonucAlani">
+        <h3 style="margin:0 0 15px 0;">İnfaz Dökümü</h3>
+        
+        <div class="t-row t-kapali">
+            <div class="t-date" id="dGiris">-</div>
+            <div class="t-card">
+                <strong>KAPALI CEZAEVİ</strong><br>
+                <span id="sKapali">-</span>
+            </div>
+        </div>
+
+        <div class="t-row t-acik">
+            <div class="t-date" id="dAcik">-</div>
+            <div class="t-card">
+                <strong>AÇIK CEZAEVİ</strong><br>
+                <span id="sAcik">-</span>
+            </div>
+        </div>
+
+        <div class="t-row t-denetim">
+            <div class="t-date" id="dDenetim">-</div>
+            <div class="t-card">
+                <strong>DENETİMLİ SERBESTLİK</strong><br>
+                <span id="sDenetim">-</span>
+            </div>
+        </div>
+
+        <div class="t-row">
+            <div class="t-date" id="dBihakkin">-</div>
+            <div class="t-card" style="border-left:4px solid #333; background:#fff;">
+                <strong>BİHAKKIN TAHLİYE</strong> (Ceza Sonu)
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const T_YENI_KANUN = new Date('2023-07-31'); 
+    const T_COVID_BAS = new Date('2020-03-30'); 
+
+    function formatDate(date) {
+        let d = date.getDate();
+        let m = date.getMonth() + 1;
+        let y = date.getFullYear();
+        return (d < 10 ? '0' + d : d) + '.' + (m < 10 ? '0' + m : m) + '.' + y;
+    }
+
+    function yasHesapla(dogum, suc) {
+        let age = suc.getFullYear() - dogum.getFullYear();
+        let m = suc.getMonth() - dogum.getMonth();
+        if (m < 0 || (m === 0 && suc.getDate() < dogum.getDate())) {
+            age--;
+        }
+        return age;
+    }
+
+    function analizEt() {
+        let sucTarihiVal = document.getElementById('sucTarihi').value;
+        let dogumTarihiVal = document.getElementById('dogumTarihi').value;
+        let sucTipi = document.getElementById('sucTipi').value;
+        let isMukerrirCheckbox = document.getElementById('chkMukerrir');
+        
+        let badgeYas = document.getElementById('badgeYas');
+        let badgeDonem = document.getElementById('badgeDonem');
+        let btn = document.getElementById('btnHesapla');
+        let uyari = document.getElementById('hesaplamaUyari');
+
+        // Varsayılanlar
+        let age = 30; // Varsayılan yetişkin
+        let rejim = "standart"; 
+        
+        // 1. YAŞ HESABI VE KONTROLÜ
+        if (sucTarihiVal && dogumTarihiVal) {
+            let sDate = new Date(sucTarihiVal);
+            let dDate = new Date(dogumTarihiVal);
+            
+            age = yasHesapla(dDate, sDate);
+            
+            if(age < 0) {
+                badgeYas.innerText = "Hatalı Tarih!";
+                badgeYas.className = "info-item info-error";
+                return;
+            }
+
+            if (age < 12) {
+                badgeYas.innerText = age + " Yaş (Ceza Ehliyeti Yok)";
+                badgeYas.className = "info-item info-error";
+                uyari.style.display = 'block';
+                btn.disabled = true;
+            } else if (age < 15) {
+                badgeYas.innerText = age + " Yaş (12-15 Yaş SSÇ)";
+                badgeYas.className = "info-item info-active";
+                uyari.style.display = 'none';
+                btn.disabled = false;
+            } else if (age < 18) {
+                badgeYas.innerText = age + " Yaş (15-18 Yaş SSÇ)";
+                badgeYas.className = "info-item info-active";
+                uyari.style.display = 'none';
+                btn.disabled = false;
+            } else {
+                badgeYas.innerText = age + " Yaş (Yetişkin)";
+                badgeYas.className = "info-item info-success";
+                uyari.style.display = 'none';
+                btn.disabled = false;
+            }
+        } else {
+            badgeYas.innerText = "Tarihleri Giriniz";
+            badgeYas.className = "info-item";
+        }
+
+        // 2. TEKERRÜR KONTROLÜ (TCK 58/5)
+        // 18 yaşından küçükse tekerrür checkbox'ı kapatılır.
+        if (age < 18) {
+            isMukerrirCheckbox.checked = false;
+            isMukerrirCheckbox.disabled = true;
+        } else {
+            isMukerrirCheckbox.disabled = false;
+        }
+        let isMukerrir = isMukerrirCheckbox.checked;
+
+        // 3. TARİH/DÖNEM ANALİZİ
+        if (sucTarihiVal) {
+            let sDate = new Date(sucTarihiVal);
+            if (sDate >= T_YENI_KANUN) {
+                badgeDonem.innerText = "Yeni İnfaz (%40 Yatar)";
+                badgeDonem.className = "info-item info-error"; // Sıkı rejim diye kırmızımsı
+                rejim = "yeni_yasa";
+            } else if (sDate <= T_COVID_BAS) {
+                badgeDonem.innerText = "Geçici Md.6 (Lehe - 3 Yıl D.)";
+                badgeDonem.className = "info-item info-success";
+                rejim = "eski_lehe";
+            } else {
+                badgeDonem.innerText = "Standart Rejim";
+                badgeDonem.className = "info-item";
+                rejim = "standart";
+            }
+        }
+
+        // 4. ORAN BELİRLEME
+        let oran = 0.5;
+        // Çocuk İndirimi (Her dönemde lehe)
+        if(age < 18 && age >= 12) {
+            oran = 0.5; // Çocuk ağır ceza olsa bile genelde 1/2
+        }
+
+        // Suç Tipi Etkisi (Yetişkinse)
+        if (age >= 18) {
+            if(['kasten_oldurme','cinsel','uyusturucu'].includes(sucTipi)) {
+                oran = 0.6666666667; 
+            }
+        }
+
+        if(sucTipi === 'teror') oran = 0.75; // Terör çocukta da ağırdır (İstisnalar hariç)
+
+        // Tekerrür
+        if(isMukerrir && oran < 0.6) oran = 0.6666666667;
+
+        // UI Oran
+        let oranSel = document.getElementById('infazOrani');
+        if(oran > 0.7) oranSel.value = "0.75";
+        else if(oran > 0.6) oranSel.value = "0.6666666667";
+        else oranSel.value = "0.5";
+
+        // 5. DENETİM & AÇIK KURALLARI
+        let denetimSel = document.getElementById('denetimSuresi');
+        let acikSel = document.getElementById('acikKurali');
+
+        if (rejim === 'yeni_yasa') {
+            denetimSel.value = "yeni_40";
+            acikSel.value = "1/10";
+        } 
+        else if (rejim === 'eski_lehe' && sucTipi === 'adi' && !isMukerrir && oran === 0.5) {
+            denetimSel.value = "3yil";
+            acikSel.value = "1ay";
+        } 
+        else {
+            denetimSel.value = "1yil";
+            if(sucTipi === 'adi' && !isMukerrir) acikSel.value = "1ay";
+            else acikSel.value = "1/10";
+        }
+
+        if(sucTipi === 'teror') acikSel.value = "yok";
+    }
+
+    function hesapla() {
+        let girisVal = document.getElementById('girisTarihi').value;
+        if(!girisVal) { alert("Lütfen Giriş Tarihi seçiniz."); return; }
+        let girisTarihi = new Date(girisVal);
+
+        let yil = parseInt(document.getElementById('hYil').value) || 0;
+        let ay = parseInt(document.getElementById('hAy').value) || 0;
+        let gun = parseInt(document.getElementById('hGun').value) || 0;
+        let mahsup = parseInt(document.getElementById('mahsup').value) || 0;
+
+        let bihakkin = new Date(girisTarihi);
+        bihakkin.setFullYear(bihakkin.getFullYear() + yil);
+        bihakkin.setMonth(bihakkin.getMonth() + ay);
+        bihakkin.setDate(bihakkin.getDate() + gun);
+
+        let toplamCezaGun = Math.ceil((bihakkin - girisTarihi) / (1000 * 60 * 60 * 24));
+        if(toplamCezaGun <= 0) return;
+
+        let oran = parseFloat(document.getElementById('infazOrani').value);
+        let denetimKural = document.getElementById('denetimSuresi').value;
+        let acikKural = document.getElementById('acikKurali').value;
+
+        // Hesaplamalar
+        let kstToplamYatar = Math.ceil(toplamCezaGun * oran);
+        let zorunluCezaevi = 0;
+        let denetimSuresi = 0;
+
+        if (denetimKural === 'yeni_40') {
+            let minYatar = Math.ceil(toplamCezaGun * 0.40);
+            if (minYatar > kstToplamYatar) minYatar = kstToplamYatar;
+            zorunluCezaevi = minYatar;
+            denetimSuresi = kstToplamYatar - zorunluCezaevi;
+        } else {
+            let denetimYil = (denetimKural === '3yil') ? 3 : 1;
+            let denetimGun = denetimYil * 365;
+            zorunluCezaevi = kstToplamYatar - denetimGun;
+            if (zorunluCezaevi < 0) zorunluCezaevi = 0;
+            denetimSuresi = kstToplamYatar - zorunluCezaevi;
+        }
+
+        // Kapalı/Açık
+        let kapaliSure = 0;
+        if (acikKural === 'yok') kapaliSure = zorunluCezaevi;
+        else if (acikKural === '1/10') kapaliSure = Math.ceil(toplamCezaGun / 10);
+        else if (acikKural === '1ay') kapaliSure = 30;
+
+        if(kapaliSure > zorunluCezaevi) kapaliSure = zorunluCezaevi;
+        let acikSure = zorunluCezaevi - kapaliSure;
+
+        // Mahsup
+        let kalanMahsup = mahsup;
+        if(kalanMahsup >= kapaliSure) {
+            kalanMahsup -= kapaliSure;
+            kapaliSure = 0;
+            if(kalanMahsup >= acikSure) {
+                kalanMahsup -= acikSure;
+                acikSure = 0;
+            } else {
+                acikSure -= kalanMahsup;
+            }
+        } else {
+            kapaliSure -= kalanMahsup;
+        }
+
+        // Yazdır
+        let d = new Date(girisTarihi);
+        document.getElementById('dGiris').innerText = formatDate(d);
+        document.getElementById('sKapali').innerText = kapaliSure + " GÜN";
+        
+        d.setDate(d.getDate() + kapaliSure);
+        document.getElementById('dAcik').innerText = kapaliSure > 0 ? formatDate(d) : "Doğrudan/Tahliye";
+        document.getElementById('sAcik').innerText = acikSure + " GÜN";
+        
+        d.setDate(d.getDate() + acikSure);
+        document.getElementById('dDenetim').innerText = (acikSure>0 || kapaliSure>0) ? formatDate(d) : formatDate(girisTarihi);
+        document.getElementById('sDenetim').innerText = denetimSuresi + " GÜN";
+
+        let bDate = new Date(bihakkin);
+        bDate.setDate(bDate.getDate() - mahsup);
+        document.getElementById('dBihakkin').innerText = formatDate(bDate);
+
+        document.getElementById('sonucAlani').style.display = 'block';
+    }
+    
+    window.onload = analizEt;
+</script>
+
+</body>
+</html>
